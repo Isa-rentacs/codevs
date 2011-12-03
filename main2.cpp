@@ -512,10 +512,6 @@ void AI2(){
             inst.PB(Inst(7,5,4,2));
         }
     }
-    //ランダムに選んでいずれかのsinkへの距離の最小値が大きくなる場合は置く
-    int count = 0;        //置いた砲台の数
-    int loop_count=0;     //連続して失敗した試行数、一定以上で終了
-
     //一度最短経路を計算しておく
     whole_reachable2();
     for(int i=0;i<source.size();i++){
@@ -523,14 +519,28 @@ void AI2(){
             prev_min[i][j] = min_distance[i][j];
         }
     }
-    int thresh = 9;
-    while(loop_count <= (H-2)*(W-2)*3 && count <= (H-2) * (W-2) / thresh){ //thresholdは適当
-        int candx, candy;
-      
+    double rate = 9;
+    int loop_count=0;     //連続して失敗した試行数、一定以上で終了
+    int count = 0;        //置いた砲台の数
+    int phase = 0;
+
+    if(mapnum >= 15){
+        rate = 10;
+    }else if(mapnum >= 23){
+        rate = 20;
+    }
+
+  BEGIN_RAND:
+    while(loop_count <= (H-2)*(W-2)*10 && count <= (H-2) * (W-2) / rate){ //thresholdは適当
+        //ランダムに選んでいずれかのsinkへの距離の最小値が大きくなる場合は置く
         //while前に全source-sink間で最短経路を計算
         //randomize時に1回計算
         //置くなら　　->更新
         //置かないなら->そのまま
+
+        int candx, candy; 
+        int kind = 0;         //設置する砲台の種類 
+        int level = -1;       //設置する砲台のレベル
         candx = (rand() % (H-2)) + 1;
         candy = (rand() % (W-2)) + 1;
 
@@ -546,26 +556,46 @@ void AI2(){
         if(!whole_reachable2()){
             f[candx][candy] = '0';
             loop_count++;
-            cout << "dmp" << endl;
         }else{
             bool isok = false;
             for(int i=0;i<sink.size();i++){
                 for(int j=0;j<source.size();j++){
-                    if(prev_min[j][i] < min_distance[j][i]){
+                    //if(min_distance[j][i] - prev_min[j][i] != 0)
+                    //cerr << j << " to " << i << " increases " << min_distance[j][i] - prev_min[j][i] << endl;
+                    double threshold;
+                    if(mapnum != 16 && phase == 0){
+                        threshold = 1.5;
+                    }else{
+                        threshold = 1;
+                    }
+                    if(min_distance[j][i] - prev_min[j][i] >= 1){
                         //どこか1ルートでも最短経路が延びていれば置く
                         isok = true;
+                        if(min_distance[j][i] <= 5){
+                            kind = 1;
+                        }
                     }
                 }
             }
-            dump(isok);
             if(isok){
                 //確定させる
                 if(mapnum <= 2){
-                    inst.PB(Inst(candx,candy,0,0));
+                    inst.PB(Inst(candx,candy,0,kind));
                 }else if(mapnum == 3){
-                    inst.PB(Inst(candx,candy,1,0));
+                    inst.PB(Inst(candx,candy,1,kind));
                 }else{
-                    inst.PB(Inst(candx,candy,2,0));
+                    if(kind != 1){
+                        inst.PB(Inst(candx,candy,2,kind));
+                        /*
+                        if(mapnum <= 9 || mapnum == 16 || rand()%8 != 7){
+                            inst.PB(Inst(candx,candy,2,kind));
+                        }else{
+                            inst.PB(Inst(candx,candy,1,kind));
+                        }
+                        */
+                    }else{
+                        inst.PB(Inst(candx,candy,4,kind));
+                    }
                 }
                 count++;
                 loop_count = 0;
@@ -582,6 +612,10 @@ void AI2(){
             }
         }
     }
+    if(phase == 0 && count <= (H-2)*(W-2)/rate){
+        phase = 1;
+        goto BEGIN_RAND;
+    }
 }
 
 int main(void){
@@ -592,15 +626,12 @@ int main(void){
     srand(time(NULL));
 
     cin >> S;
-    //scanf("%d\n", &S);
     for(mapnum = 0; mapnum < S; mapnum++){
 #ifdef DEBUG
         dump(mapnum);
 #endif
         cin >> W >> H;
-        //scanf("%d %d\n", &W, &H);
         //initialize
-        //fill((char *)f, (char *)f+(MAX_HEIGHT)*(MAX_WIDTH),'1');
         source.clear();
         sink.clear();
         //region read map
@@ -618,7 +649,6 @@ int main(void){
         }
         //endregion read map
         cin >> L;
-        //scanf("%d\n", &L);
         cin >> str; //expected "END" for each map
         if(str != "END"){
             cout << "[main]invalid data on the end of read map" << endl;
@@ -627,12 +657,10 @@ int main(void){
                 
         for(levelnum = 0; levelnum < L; levelnum++){
             cin >> LIFE >> M >> T >> E;
-            //scanf("%d %d %d %d\n", &LIFE, &M, &T, &E);
             //region read tower data
             towers.clear(); //initialized towers
             for(int i=0;i<T;i++){
                 int x,y,a,c;
-                //scanf("%d%d%d%d", &x, &y, &a, &c);
                 cin >> x >> y >> a >> c;
                 //set each tower to field
                 f[x+1][y+1] = 't';
@@ -644,7 +672,6 @@ int main(void){
             enemies.clear();
             for(int i=0;i<E;i++){
                 int x,y,t,l,s;
-                //scanf("%d %d %d %d %d\n", &x, &y, &t, &l, &s);
                 cin >> x >> y >> t >> l >> s;
                 enemies.PB(Enemy(x,y,t,l,s));
             }
