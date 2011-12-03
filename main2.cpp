@@ -481,6 +481,9 @@ void output(void){
 //俺俺乱択
 //いずれかのsource-sink pathの経路が延びるなら置く
 void AI2(){
+    double prev_min[source.size()][sink.size()];
+    double after_min[source.size()][sink.size()];
+
 #ifdef DEBUG_RANDOM
     cout << "run AI2" << endl;
 #endif
@@ -509,22 +512,25 @@ void AI2(){
             inst.PB(Inst(7,5,4,2));
         }
     }
-    
-    
-
     //ランダムに選んでいずれかのsinkへの距離の最小値が大きくなる場合は置く
     int count = 0;        //置いた砲台の数
     int loop_count=0;     //連続して失敗した試行数、一定以上で終了
-    while(loop_count <= (H-2)*(W-2)*2 && count <= (H-2) * (W-2) / 3){ //thresholdは適当
+
+    //一度最短経路を計算しておく
+    whole_reachable2();
+    for(int i=0;i<source.size();i++){
+        for(int j=0;j<sink.size();j++){
+            prev_min[i][j] = min_distance[i][j];
+        }
+    }
+    int thresh = 9;
+    while(loop_count <= (H-2)*(W-2)*3 && count <= (H-2) * (W-2) / thresh){ //thresholdは適当
         int candx, candy;
       
-        //ここの計算はうまくやれば1回で済むはず。
         //while前に全source-sink間で最短経路を計算
         //randomize時に1回計算
         //置くなら　　->更新
         //置かないなら->そのまま
-        double prev_min[sink.size()], after_min[sink.size()];
-        int isource, isink;
         candx = (rand() % (H-2)) + 1;
         candy = (rand() % (W-2)) + 1;
 
@@ -534,56 +540,40 @@ void AI2(){
             continue;
         }
 
-        //設置前のsinkへの距離の最小値を求める
-        fill((double *)dist_min, (double *)dist_min+sink.size(), 1e+10);
-        fill((double *)work, (double *)work+sink.size(), 1e+10);
-        for(int i=0;i<source.size();i++){
-            calc_dst_from(source[i].x, source[i].y);
-            for(int j=0;j<sink.size();j++){
-                if(dist_min[j] > d[sink[j].x][sink[j].y]){
-                    dist_min[j] = d[sink[j].x][sink[j].y];
-                }
-            }
-        }
-      
         //設置してみる
         f[candx][candy] = 't';
         //道が存在しなければ不可
-        if(!whole_reachable()){
+        if(!whole_reachable2()){
             f[candx][candy] = '0';
             loop_count++;
             cout << "dmp" << endl;
         }else{
-            /*
-            //設置後のsinkへの距離の最小値を求める
-            for(int i=0;i<source.size();i++){
-            calc_dst_from(source[i].x, source[i].y);
-            for(int j=0;j<sink.size();j++){
-            work = min(work, d[sink[j].x][sink[j].y]);
-            }
-            }
-            */
             bool isok = false;
             for(int i=0;i<sink.size();i++){
                 for(int j=0;j<source.size();j++){
-                    work[i] = min(work[i], min_distance[j][i]);
+                    if(prev_min[j][i] < min_distance[j][i]){
+                        //どこか1ルートでも最短経路が延びていれば置く
+                        isok = true;
+                    }
                 }
-                dump(dist_min[i]);
-                dump(work[i]);
-                if(dist_min[i] < work[i]) isok = true;
             }
             dump(isok);
             if(isok){
                 //確定させる
                 if(mapnum <= 2){
-                    inst.PB(Inst(candx,candy,0,1));
+                    inst.PB(Inst(candx,candy,0,0));
                 }else if(mapnum == 3){
-                    inst.PB(Inst(candx,candy,2,1));
+                    inst.PB(Inst(candx,candy,1,0));
                 }else{
-                    inst.PB(Inst(candx,candy,3,1));
+                    inst.PB(Inst(candx,candy,2,0));
                 }
                 count++;
                 loop_count = 0;
+                for(int i=0;i<source.size();i++){
+                    for(int j=0;j<sink.size();j++){
+                        prev_min[i][j] = min_distance[i][j];
+                    }
+                }
 #ifdef DEBUG_RANDOM
                 cout << "put" << endl;
 #endif
