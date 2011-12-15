@@ -478,6 +478,8 @@ void output(void){
     inst.clear();
     return;
 }
+
+
 //俺俺乱択
 //いずれかのsource-sink pathの経路が延びるなら置く
 void AI2(){
@@ -524,14 +526,16 @@ void AI2(){
     int count = 0;        //置いた砲台の数
     int phase = 0;
 
-    if(mapnum >= 15){
-        rate = 10;
-    }else if(mapnum >= 23){
-        rate = 20;
+    if(mapnum <= 8){
+        rate = 30;
+    }else if(mapnum < 40){
+        rate = 40;
+    }else{
+        rate = 3;
     }
 
   BEGIN_RAND:
-    while(loop_count <= (H-2)*(W-2)*10 && count <= (H-2) * (W-2) / rate){ //thresholdは適当
+    while(loop_count <= (H-2)*(W-2)*50 && count <= (H-2) * (W-2) / rate){ //thresholdは適当
         //ランダムに選んでいずれかのsinkへの距離の最小値が大きくなる場合は置く
         //while前に全source-sink間で最短経路を計算
         //randomize時に1回計算
@@ -568,11 +572,19 @@ void AI2(){
                     }else{
                         threshold = 1;
                     }
-                    if(min_distance[j][i] - prev_min[j][i] >= 1){
-                        //どこか1ルートでも最短経路が延びていれば置く
-                        isok = true;
-                        if(min_distance[j][i] <= 5){
-                            kind = 1;
+                    if(phase == 0){
+                        if(min_distance[j][i] - prev_min[j][i] >= 1){
+                            //どこか1ルートでも最短経路が延びていれば置く
+                            isok = true;
+                            /*
+                              if(min_distance[j][i] <= 5){
+                              kind = 1;
+                              }
+                            */
+                        }
+                    }else{
+                        if(min_distance[j][i] - prev_min[j][i] > 0){
+                            isok = true;
                         }
                     }
                 }
@@ -585,7 +597,11 @@ void AI2(){
                     inst.PB(Inst(candx,candy,1,kind));
                 }else{
                     if(kind != 1){
-                        inst.PB(Inst(candx,candy,2,kind));
+                        if(mapnum < 39){
+                            inst.PB(Inst(candx,candy,0,kind));
+                        }else{
+                            inst.PB(Inst(candx,candy,4,kind));
+                        }
                         /*
                         if(mapnum <= 9 || mapnum == 16 || rand()%8 != 7){
                             inst.PB(Inst(candx,candy,2,kind));
@@ -594,7 +610,7 @@ void AI2(){
                         }
                         */
                     }else{
-                        inst.PB(Inst(candx,candy,4,kind));
+                        inst.PB(Inst(candx,candy,0,kind));
                     }
                 }
                 count++;
@@ -614,9 +630,87 @@ void AI2(){
     }
     if(phase == 0 && count <= (H-2)*(W-2)/rate){
         phase = 1;
+        loop_count = 0;
         goto BEGIN_RAND;
     }
 }
+
+//全sourceの回りに最大強化ラピッドを置く
+void AI3(void){
+    for(int i=0;i<source.size();i++){
+        for(int j=0;j<8;j++){ //全ての隣接セルについて
+            //置けなかったら諦める
+            if(f[source[i].x + dx[j]][source[i].y + dy[j]] != '0') continue;
+            //おいてみる
+            f[source[i].x + dx[j]][source[i].y + dy[j]] = 't';
+            //到達不可能であれば
+            if(!whole_reachable()){
+                f[source[i].x + dx[j]][source[i].y + dy[j]] = '0'; //戻す
+            }else{
+                inst.PB(Inst(source[i].x + dx[j], source[i].y + dy[j], 4, 0));
+                break;
+            }
+        }
+    }
+}
+
+//全sourceの回りに最大強化ラピッドを2個置く
+void AI4(void){
+    bool flag = false;
+    for(int i=0;i<source.size();i++){
+        for(int j=0;j<8;j++){ //全ての隣接セルについて
+            //置けなかったら諦める
+            if(f[source[i].x + dx[j]][source[i].y + dy[j]] != '0') continue;
+            //おいてみる
+            f[source[i].x + dx[j]][source[i].y + dy[j]] = 't';
+            //到達不可能であれば
+            if(!whole_reachable()){
+                f[source[i].x + dx[j]][source[i].y + dy[j]] = '0'; //戻す
+            }else{
+                inst.PB(Inst(source[i].x + dx[j], source[i].y + dy[j], 4, 0));
+                if(flag == false){
+                    flag = true;
+                }else{
+                    flag = false;
+                    break;
+                }
+            }
+        }
+    }
+}
+
+//全sourceと全sinkの回りに置けるだけおく
+void AI5(void){
+    for(int i=0;i<source.size();i++){
+        for(int j=0;j<8;j++){ //全ての隣接セルについて
+            //置けなかったら諦める
+            if(f[source[i].x + dx[j]][source[i].y + dy[j]] != '0') continue;
+            //おいてみる
+            f[source[i].x + dx[j]][source[i].y + dy[j]] = 't';
+            //到達不可能であれば
+            if(!whole_reachable()){
+                f[source[i].x + dx[j]][source[i].y + dy[j]] = '0'; //戻す
+            }else{
+                inst.PB(Inst(source[i].x + dx[j], source[i].y + dy[j], 4, 0));
+            }
+        }
+    }
+    for(int i=0;i<sink.size();i++){
+        for(int j=0;j<8;j++){ //全ての隣接セルについて
+            //置けなかったら諦める
+            if(f[sink[i].x + dx[j]][sink[i].y + dy[j]] != '0') continue;
+            //おいてみる
+            f[sink[i].x + dx[j]][sink[i].y + dy[j]] = 't';
+            //到達不可能であれば
+            if(!whole_reachable()){
+                f[sink[i].x + dx[j]][sink[i].y + dy[j]] = '0'; //戻す
+            }else{
+                inst.PB(Inst(sink[i].x + dx[j], sink[i].y + dy[j], 4, 0));
+            }
+        }
+    }
+}
+
 
 int main(void){
 #ifdef DEBUG
@@ -685,10 +779,14 @@ int main(void){
             //region AI
             if(mapnum <= 2){
                 AI();
-            }
-            if(mapnum >= 3 && levelnum == 0){
-                //レベルの初めにしかおかない
-                AI2();
+            }else if(levelnum == 0){
+                if(mapnum < 40){
+                    AI4();
+                    AI2();
+                }else{
+                    AI4();
+                    AI2();
+                }
             }
             output();
             //endregion  AI
