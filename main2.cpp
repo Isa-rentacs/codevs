@@ -171,7 +171,7 @@ void calc_dst_from(int x, int y){
             nxt_y = cur.Y + dy[i];
             if(f[nxt_x][nxt_y] != 't' && f[nxt_x][nxt_y] != '1' &&
                v[nxt_x][nxt_y] == false){
-                d[nxt_x][nxt_y] = min(d[nxt_x][nxt_y], d[cur.X][cur.Y] + 1);
+                d[nxt_x][nxt_y] = min(d[nxt_x][nxt_y], d[cur.X][cur.Y] + 2);
                 v[nxt_x][nxt_y] = true;
                 q.PB(MP(nxt_x, nxt_y));
 #ifdef DEBUG_BFS
@@ -189,7 +189,7 @@ void calc_dst_from(int x, int y){
                f[nxt_x][cur.Y] != 't' &&
                f[nxt_x][cur.Y] != '1' &&
                v[nxt_x][nxt_y] == false){
-                d[nxt_x][nxt_y] = min(d[nxt_x][nxt_y], d[cur.X][cur.Y] + 1.4);
+                d[nxt_x][nxt_y] = min(d[nxt_x][nxt_y], d[cur.X][cur.Y] + 3);
                 v[nxt_x][nxt_y] = true;
                 q.PB(MP(nxt_x, nxt_y));
 #ifdef DEBUG_BFS
@@ -537,7 +537,7 @@ void AI2(){
     }
 
   BEGIN_RAND:
-    while(loop_count <= (H-2)*(W-2)*50 && count <= (H-2) * (W-2) / rate){ //thresholdは適当
+    while(loop_count <= (H-2)*(W-2)*15 && count <= (H-2) * (W-2) / rate){ //thresholdは適当
         //ランダムに選んでいずれかのsinkへの距離の最小値が大きくなる場合は置く
         //while前に全source-sink間で最短経路を計算
         //randomize時に1回計算
@@ -567,7 +567,7 @@ void AI2(){
             for(int i=0;i<sink.size();i++){
                 for(int j=0;j<source.size();j++){
                     if(phase == 0){
-                        if(min_distance[j][i] - prev_min[j][i] >= 1){
+                        if(min_distance[j][i] - prev_min[j][i] > 2){
                             //どこか1ルートでも最短経路が延びていれば置く
                             isok = true;
                             /*
@@ -648,10 +648,11 @@ void AI3(void){
     }
 }
 
-//全sourceの回りに最大強化ラピッドを2個置く
+//全sourceの回りに最大強化ラピッドをnum個置く
 void AI4(void){
-    bool flag = false;
+    int num = 2, cur;
     for(int i=0;i<source.size();i++){
+        cur = 0;
         for(int j=0;j<8;j++){ //全ての隣接セルについて
             //置けなかったら諦める
             if(f[source[i].x + dx[j]][source[i].y + dy[j]] != '0') continue;
@@ -661,11 +662,13 @@ void AI4(void){
             if(!whole_reachable()){
                 f[source[i].x + dx[j]][source[i].y + dy[j]] = '0'; //戻す
             }else{
-                inst.PB(Inst(source[i].x + dx[j], source[i].y + dy[j], 4, 0));
-                if(flag == false){
-                    flag = true;
+                if(cur == 0){
+                    inst.PB(Inst(source[i].x + dx[j], source[i].y + dy[j], 4, 0));
+                    cur++;
+                }else if(cur == 1){
+                    inst.PB(Inst(source[i].x + dx[j], source[i].y + dy[j], 1, 0));
+                    cur++;
                 }else{
-                    flag = false;
                     break;
                 }
             }
@@ -725,13 +728,19 @@ double random_after40(){
             prev_min[i][j] = min_distance[i][j];
         }
     }
-    double rate = 2.5;
+    double rate;
+
+    if(mapnum <= 58){
+        rate = 4;
+    }else{
+        rate = 2;
+    }
     int loop_count=0;     //連続して失敗した試行数、一定以上で終了
     int count = 0;        //置いた砲台の数
     int phase = 0;//0:=最短経路の改善が1以上でないと置かない 1:=そうでなくても置く
 
 BEGIN_RAND:
-    while(loop_count <= (H-2)*(W-2)*50 && count <= (H-2) * (W-2) / rate){ //thresholdは適当
+    while(loop_count <= (H-2)*(W-2)*8 && count <= (H-2) * (W-2) / rate){ //thresholdは適当
         //ランダムに選んでいずれかのsinkへの最短経路が長くなる場合は置く
         //while前に全source-sink間で最短経路を計算
         //randomize時に1回計算
@@ -887,16 +896,16 @@ int main(void){
                 return -1;
             }
             //region AI
-            if(mapnum <= 2){
+            if(mapnum <= 0){
                 AI();
             }else if(levelnum == 0){
                 if(mapnum < 40){
                     AI4();
-                    AI2();
+                    //AI2();
                 }else{
                     //AI4();
                     double dist = 0, candidate;
-                    for(int i=0;i<5;i++){
+                    for(int i=0;i<60;i++){
                         candidate = random_after40();
 #ifdef DEBUG_AFTER_40
                         printf("candidate = %lf\n", candidate);
