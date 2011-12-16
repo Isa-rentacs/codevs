@@ -98,6 +98,8 @@ bool v[MAX_HEIGHT][MAX_WIDTH];   //BFS時のvisited保持
 vector<Tower> towers;                //Towerの集合
 vector<Enemy> enemies;               //Enemyの集合
 vector<Inst> inst;                   //output用
+vector<Inst> tmpinst;
+vector<Inst> addinst;
 vector<Source> source;               //敵生成場所
 vector<Source> sink;                 //敵目的地
 string str;
@@ -524,7 +526,7 @@ void AI2(){
     double rate = 9;
     int loop_count=0;     //連続して失敗した試行数、一定以上で終了
     int count = 0;        //置いた砲台の数
-    int phase = 0;
+    int phase = 0;//0:=最短経路の改善が1以上でないと置かない 1:=そうでなくても置く
 
     if(mapnum <= 8){
         rate = 30;
@@ -564,14 +566,6 @@ void AI2(){
             bool isok = false;
             for(int i=0;i<sink.size();i++){
                 for(int j=0;j<source.size();j++){
-                    //if(min_distance[j][i] - prev_min[j][i] != 0)
-                    //cerr << j << " to " << i << " increases " << min_distance[j][i] - prev_min[j][i] << endl;
-                    double threshold;
-                    if(mapnum != 16 && phase == 0){
-                        threshold = 1.5;
-                    }else{
-                        threshold = 1;
-                    }
                     if(phase == 0){
                         if(min_distance[j][i] - prev_min[j][i] >= 1){
                             //どこか1ルートでも最短経路が延びていれば置く
@@ -603,11 +597,11 @@ void AI2(){
                             inst.PB(Inst(candx,candy,4,kind));
                         }
                         /*
-                        if(mapnum <= 9 || mapnum == 16 || rand()%8 != 7){
-                            inst.PB(Inst(candx,candy,2,kind));
-                        }else{
-                            inst.PB(Inst(candx,candy,1,kind));
-                        }
+                          if(mapnum <= 9 || mapnum == 16 || rand()%8 != 7){
+                          inst.PB(Inst(candx,candy,2,kind));
+                          }else{
+                          inst.PB(Inst(candx,candy,1,kind));
+                          }
                         */
                     }else{
                         inst.PB(Inst(candx,candy,0,kind));
@@ -711,6 +705,122 @@ void AI5(void){
     }
 }
 
+//マップ40以降はこのルーチンを使う
+//返り値:source-sink間の最短経路の最小値
+double random_after40(){
+    double prev_min[source.size()][sink.size()];
+    double after_min[source.size()][sink.size()];
+    double ret = 1 << 30;
+
+    tmpinst.clear();
+
+#ifdef DEBUG_RANDOM
+    cout << "run random after lvl 40" << endl;
+#endif
+    
+    //一度最短経路を計算しておく
+    whole_reachable2();
+    for(int i=0;i<source.size();i++){
+        for(int j=0;j<sink.size();j++){
+            prev_min[i][j] = min_distance[i][j];
+        }
+    }
+    double rate = 5;
+    int loop_count=0;     //連続して失敗した試行数、一定以上で終了
+    int count = 0;        //置いた砲台の数
+    int phase = 0;//0:=最短経路の改善が1以上でないと置かない 1:=そうでなくても置く
+
+BEGIN_RAND:
+    while(loop_count <= (H-2)*(W-2)*50 && count <= (H-2) * (W-2) / rate){ //thresholdは適当
+        //ランダムに選んでいずれかのsinkへの最短経路が長くなる場合は置く
+        //while前に全source-sink間で最短経路を計算
+        //randomize時に1回計算
+        //置くなら　　->更新
+        //置かないなら->そのまま
+
+        int candx, candy; 
+        int kind = 0;         //設置する砲台の種類 
+        int level = -1;       //設置する砲台のレベル
+        candx = (rand() % (H-2)) + 1;
+        candy = (rand() % (W-2)) + 1;
+
+        //置けなかったらやりなおし
+        if(f[candx][candy] != '0'){
+            loop_count++;
+            continue;
+        }
+
+        //設置してみる
+        f[candx][candy] = 't';
+        //道が存在しなければ不可
+        if(!whole_reachable2()){
+            f[candx][candy] = '0';
+            loop_count++;
+        }else{
+            bool isok = false;
+            for(int i=0;i<sink.size();i++){
+                for(int j=0;j<source.size();j++){
+                    if(phase == 0){
+                        if(min_distance[j][i] - prev_min[j][i] >= 1){
+                            isok = true;
+                        }
+                    }else{
+                        if(min_distance[j][i] - prev_min[j][i] > 0){
+                            isok = true;
+                        }
+                    }
+                }
+            }
+            if(isok){
+                //確定させる
+                tmpinst.PB(Inst(candx,candy,4,kind));
+                count++;
+                loop_count = 0;
+                for(int i=0;i<source.size();i++){
+                    for(int j=0;j<sink.size();j++){
+                        prev_min[i][j] = min_distance[i][j];
+                    }
+                }
+#ifdef DEBUG_RANDOM
+                cout << "put" << endl;
+#endif
+            }else{
+                f[candx][candy] = '0';
+            }
+        }
+    }
+    if(phase == 0 && count <= (H-2)*(W-2)/rate){
+        phase = 1;
+        loop_count = 0;
+        goto BEGIN_RAND;
+    }
+
+    //returnのための値更新
+    for(int i=0;i<source.size();i++){
+        for(int j=0;j<sink.size();j++){
+            ret = min(ret, prev_min[i][j]);
+        }
+    }
+    return ret;
+}
+
+void disable_inst(vector<Inst> &arg){
+    int x,y;
+    for(int i=0;i<arg.size();i++){
+        x = arg[i].x;
+        y = arg[i].y;
+        f[x][y] = '0';
+    }
+}
+
+void enable_inst(vector<Inst> &arg){
+    int x,y;
+    for(int i=0;i<arg.size();i++){
+        x = arg[i].x;
+        y = arg[i].y;
+        f[x][y] = 't';
+    }
+}
 
 int main(void){
 #ifdef DEBUG
@@ -784,8 +894,31 @@ int main(void){
                     AI4();
                     AI2();
                 }else{
-                    AI4();
-                    AI2();
+                    //AI4();
+                    double dist = 0, candidate;
+                    for(int i=0;i<3;i++){
+                        candidate = random_after40();
+#ifdef DEBUG_AFTER_40
+                        printf("candidate = %lf\n", candidate);
+#endif
+                        //この時点でtmpinstとして置いたように盤面が変わっているので戻す
+                        disable_inst(tmpinst);
+                        if(dist < candidate){
+                            dist = candidate;
+                            addinst = tmpinst;
+#ifdef DEBUG_AFTER_40
+                            printf("# of inst = %d\n", inst.size());
+                            printf("# of tmpinst = %d\n", tmpinst.size());
+#endif
+                        }
+                    }
+                    for(int i=0;i<addinst.size();i++){
+                        inst.PB(addinst[i]);
+                    }
+#ifdef DEBUG_AFTER_40
+                    printf("# of tower = %d\n", inst.size());
+#endif
+                    enable_inst(inst);
                 }
             }
             output();
