@@ -725,7 +725,7 @@ double random_after40(){
             prev_min[i][j] = min_distance[i][j];
         }
     }
-    double rate = 5;
+    double rate = 2.5;
     int loop_count=0;     //連続して失敗した試行数、一定以上で終了
     int count = 0;        //置いた砲台の数
     int phase = 0;//0:=最短経路の改善が1以上でないと置かない 1:=そうでなくても置く
@@ -896,7 +896,7 @@ int main(void){
                 }else{
                     //AI4();
                     double dist = 0, candidate;
-                    for(int i=0;i<3;i++){
+                    for(int i=0;i<5;i++){
                         candidate = random_after40();
 #ifdef DEBUG_AFTER_40
                         printf("candidate = %lf\n", candidate);
@@ -905,15 +905,12 @@ int main(void){
                         disable_inst(tmpinst);
                         if(dist < candidate){
                             dist = candidate;
-                            addinst = tmpinst;
+                            inst = tmpinst;
 #ifdef DEBUG_AFTER_40
                             printf("# of inst = %d\n", inst.size());
                             printf("# of tmpinst = %d\n", tmpinst.size());
 #endif
                         }
-                    }
-                    for(int i=0;i<addinst.size();i++){
-                        inst.PB(addinst[i]);
                     }
 #ifdef DEBUG_AFTER_40
                     printf("# of tower = %d\n", inst.size());
